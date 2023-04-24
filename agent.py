@@ -6,13 +6,12 @@ from langchain.chains import RetrievalQA
 from dotenv import load_dotenv
 import openai
 import os
-from langchain.agents import initialize_agent, Tool
-from langchain.agents import AgentType
+from langchain.agents import Tool
 import streamlit as st
 from langchain.document_loaders import WebBaseLoader
 from langchain.agents import Tool, AgentExecutor, LLMSingleActionAgent, AgentOutputParser
 from langchain.prompts import StringPromptTemplate
-from langchain import OpenAI, SerpAPIWrapper, LLMChain
+from langchain import LLMChain
 from typing import List, Union
 from langchain.schema import AgentAction, AgentFinish
 import re
@@ -22,25 +21,11 @@ st.title("Marketing Intern")
 load_dotenv()
 openai.api_key= os.environ.get("OPENAI_API_KEY")
 
+# Using ChatOpenAI for lower usage fees, but you can use OpenAI. ChatOpenAI works fine as well 
 llm = ChatOpenAI(temperature=0)
 
-# from pathlib import Path
-# relevant_parts = []
-# for p in Path(".").absolute().parts:
-#     relevant_parts.append(p)
-#     if relevant_parts[-3:] == ["langchain", "docs", "modules"]:
-#         break
-# doc_path = str(Path(*relevant_parts) / "processed" / "scraped.csv")
-# print(doc_path)
-
-# from langchain.document_loaders.csv_loader import CSVLoader
-# loader = CSVLoader(doc_path)
-# documents = loader.load()
 text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
-# texts = text_splitter.split_documents(documents)
-
 embeddings = OpenAIEmbeddings()
-# docsearch = FAISS.from_documents(texts, embeddings)
 
 def get_text():
     input_text = st.text_input("Type in the product website below", key="input")
@@ -49,13 +34,14 @@ def get_text():
 user_input = get_text()
 
 if(user_input):
+    # Loading contexts from web page 
     loader = WebBaseLoader(user_input)
-    # "https://blog.celestia.org/introducing-rollkit-a-modular-rollup-framework/"
     docs = loader.load()
     texts = text_splitter.split_documents(docs)
     db = FAISS.from_documents(texts, embeddings)
     product = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=db.as_retriever())
 
+    # Define tools that you want to use. For ex, you can use SerpAPI for Google Search
     tools = [
         Tool(
         name = "Information",
@@ -134,7 +120,7 @@ if(user_input):
                 raise ValueError(f"Could not parse LLM output: `{llm_output}`")
             
             action_input = match.group(1)
-            # Return the action and action input
+            # Use appropriate tools that the chain needs to use 
             return AgentAction(tool="Information", tool_input=action_input.strip(" ").strip('"'), log=llm_output)
         
     output_parser = CustomOutputParser()
@@ -150,7 +136,8 @@ if(user_input):
     agent_executor = AgentExecutor.from_agent_and_tools(agent=agent, tools=tools, verbose=True)
 
 if(user_input):
-    response = agent_executor.run("Create a marketing post about Rollkit.")
+    # MAKE SURE TO CHANGE THE RUN PROMPT based on the product you want to advertise.
+    response = agent_executor.run("Create a marketing post about [ ].")
     st.write('**Result:** \n')
     st.write(response)
 
